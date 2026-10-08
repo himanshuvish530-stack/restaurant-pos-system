@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant POS System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { display: flex; height: 100vh; background-color: #f4f6f9; }
+        
+        .menu-container { width: 65%; padding: 20px; overflow-y: auto; }
+        .heading { font-size: 22px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        
+        /* Table Selection Bar */
+        .table-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .table-btn { padding: 10px 18px; border: 2px solid #ddd; background: white; border-radius: 8px; cursor: pointer; font-weight: bold; color: #555; transition: 0.2s; }
+        .table-btn.active { border-color: #ff5722; background: #ff5722; color: white; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
+        .card:hover { border-color: #ff5722; transform: translateY(-3px); }
+        .card h4 { font-size: 16px; margin-bottom: 8px; color: #222; }
+        .card .price { font-weight: bold; color: #ff5722; font-size: 18px; }
+
+        .cart-container { width: 35%; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; padding: 20px; }
+        .cart-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #f4f6f9; padding-bottom: 10px; display: flex; justify-content: space-between; }
+        .selected-table-badge { background: #e8f5e9; color: #2e7d32; font-size: 14px; padding: 4px 10px; border-radius: 6px; }
+        .cart-items { flex: 1; overflow-y: auto; margin-bottom: 15px; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #eee; }
+        .qty-btn { background: #eee; border: none; width: 26px; height: 26px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        
+        .summary { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .summary div { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+        .summary .total { font-size: 18px; font-weight: bold; color: #2e7d32; border-top: 1px solid #ccc; padding-top: 6px; margin-top: 6px; }
+
+        .btn-checkout { background: #ff5722; color: white; border: none; width: 100%; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-checkout:hover { background: #e64a19; }
+    </style>
+</head>
+<body>
+
+    <div class="menu-container">
+        <div class="heading">🪑 Select Table / Order Type</div>
+        <div class="table-bar">
+            <button class="table-btn active" onclick="selectTable(this, 'Table 1')">Table 1</button>
+            <button class="table-btn" onclick="selectTable(this, 'Table 2')">Table 2</button>
+            <button class="table-btn" onclick="selectTable(this, 'Table 3')">Table 3</button>
+            <button class="table-btn" onclick="selectTable(this, 'Table 4')">Table 4</button>
+            <button class="table-btn" onclick="selectTable(this, 'Takeaway')">🥡 Takeaway</button>
+        </div>
+
+        <div class="heading">🍽️ Menu Items</div>
+        <div class="grid" id="menu-grid">
+            <p>Loading menu...</p>
+        </div>
+    </div>
+
+    <div class="cart-container">
+        <div class="cart-title">
+            <span>🛒 Current Order</span>
+            <span class="selected-table-badge" id="current-table-display">Table 1</span>
+        </div>
+        <div class="cart-items" id="cart-items">
+            <p style="color: #888;">Cart is empty</p>
+        </div>
+
+        <div class="summary">
+            <div><span>Subtotal:</span> <span id="subtotal">₹0.00</span></div>
+            <div><span>GST (5%):</span> <span id="gst">₹0.00</span></div>
+            <div class="total"><span>Grand Total:</span> <span id="grand-total">₹0.00</span></div>
+        </div>
+
+        <button class="btn-checkout" onclick="placeOrder()">PAY & PRINT BILL</button>
+    </div>
+
+    <script>
+        let cart = [];
+        let selectedTable = "Table 1";
+        const API_URL = "http://127.0.0.1:5000/api";
+
+        function selectTable(btn, tableName) {
+            document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedTable = tableName;
+            document.getElementById('current-table-display').innerText = selectedTable;
+        }
+
+        async function loadMenu() {
+            try {
+                const response = await fetch(`${API_URL}/menu`);
+                const items = await response.json();
+                const grid = document.getElementById('menu-grid');
+                grid.innerHTML = '';
+
+                items.forEach(item => {
+                    grid.innerHTML += `
+                        <div class="card" onclick="addToCart(${item.item_id}, '${item.name}', ${item.price})">
+                            <h4>${item.name}</h4>
+                            <div class="price">₹${item.price}</div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                alert("Failed to load menu. Make sure Flask app is running!");
+            }
+        }
+
+        function addToCart(id, name, price) {
+            const existing = cart.find(x => x.item_id === id);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ item_id: id, name: name, price: price, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            if (cart.length === 0) {
+                container.innerHTML = '<p style="color: #888;">Cart is empty</p>';
+                document.getElementById('subtotal').innerText = '₹0.00';
+                document.getElementById('gst').innerText = '₹0.00';
+                document.getElementById('grand-total').innerText = '₹0.00';
+                return;
+            }
+
+            container.innerHTML = '';
+            let subtotal = 0;
+
+            cart.forEach((item, index) => {
+                subtotal += item.price * item.qty;
+                container.innerHTML += `
+                    <div class="cart-item">
+                        <div>
+                            <strong>${item.name}</strong><br>
+                            <small>₹${item.price} x ${item.qty}</small>
+                        </div>
+                        <div>
+                            <button class="qty-btn" onclick="updateQty(${index}, -1)">-</button>
+                            <button class="qty-btn" onclick="updateQty(${index}, 1)">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const gst = subtotal * 0.05;
+            const grandTotal = subtotal + gst;
+
+            document.getElementById('subtotal').innerText = `₹${subtotal.toFixed(2)}`;
+            document.getElementById('gst').innerText = `₹${gst.toFixed(2)}`;
+            document.getElementById('grand-total').innerText = `₹${grandTotal.toFixed(2)}`;
+        }
+
+        function updateQty(index, change) {
+            cart[index].qty += change;
+            if (cart[index].qty <= 0) cart.splice(index, 1);
+            renderCart();
+        }
+
+        async function placeOrder() {
+            if (cart.length === 0) return alert("Cart is empty!");
+
+            const payload = {
+                order_type: selectedTable === 'Takeaway' ? 'Takeaway' : 'Dine-In',
+                payment_mode: "UPI",
+                table_no: selectedTable,
+                items: cart
+            };
+
+            const response = await fetch(`${API_URL}/orders`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if (response.status === 201) {
+                alert(`🎉 Order Placed Successfully!\n${selectedTable} | Invoice ID: #${result.invoice.order_id}\nTotal Amount: ₹${result.invoice.grand_total}`);
+                cart = [];
+                renderCart();
+            } else {
+                alert("Error placing order");
+            }
+        }
+
+        loadMenu();
+    </script>
+</body>
+</html>

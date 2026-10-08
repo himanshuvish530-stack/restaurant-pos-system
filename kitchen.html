@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Display System (KDS)</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background: #1e1e2d; color: white; padding: 20px; }
+        h1 { margin-bottom: 20px; color: #ff9800; display: flex; justify-content: space-between; align-items: center; }
+        .kds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .order-card { background: #2b2b40; border-radius: 10px; padding: 15px; border-top: 5px solid #ff9800; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .card-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #444; padding-bottom: 8px; }
+        .item-list { list-style: none; margin-bottom: 15px; }
+        .item-list li { padding: 8px 0; font-size: 18px; border-bottom: 1px dashed #3a3a52; color: #e1e1e1; }
+        .btn-done { background: #4caf50; color: white; border: none; width: 100%; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        .btn-done:hover { background: #388e3c; }
+    </style>
+</head>
+<body>
+
+    <h1>
+        <span>👨‍🍳 Kitchen Live Orders</span>
+        <small style="font-size: 14px; color: #aaa;">(Auto-Refreshes Live)</small>
+    </h1>
+    
+    <div class="kds-grid" id="kds-grid">
+        <h3>Loading pending kitchen orders...</h3>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:5000/api";
+
+        // Fetch Live Orders from Flask API
+        async function fetchKitchenOrders() {
+            try {
+                const res = await fetch(`${API_URL}/kitchen/orders`);
+                const orders = await res.json();
+                const grid = document.getElementById('kds-grid');
+
+                if (orders.length === 0) {
+                    grid.innerHTML = '<h3 style="color: #888;">No pending orders right now! 👍</h3>';
+                    return;
+                }
+
+                grid.innerHTML = '';
+                orders.forEach(o => {
+                    let itemsHtml = o.items.map(item => `<li>📌 ${item}</li>`).join('');
+                    grid.innerHTML += `
+                        <div class="order-card">
+                            <div class="card-header">
+                                <span>Order #${o.order_id} (${o.table_no})</span>
+                                <span style="color: #ff9800;">${o.order_type}</span>
+                            </div>
+                            <ul class="item-list">${itemsHtml}</ul>
+                            <button class="btn-done" onclick="markReady(${o.order_id})">MARK AS READY ✅</button>
+                        </div>
+                    `;
+                });
+            } catch (e) {
+                console.error("KDS Fetch Error", e);
+            }
+        }
+
+        // Mark Order as Complete
+        async function markReady(orderId) {
+            await fetch(`${API_URL}/kitchen/complete/${orderId}`, { method: 'POST' });
+            fetchKitchenOrders();
+        }
+
+        // Run on load + Poll every 4 seconds
+        fetchKitchenOrders();
+        setInterval(fetchKitchenOrders, 4000);
+    </script>
+</body>
+</html>

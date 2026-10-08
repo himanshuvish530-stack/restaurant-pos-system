@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS - Sales & Reports</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f4f6f9; padding: 30px; }
+        h1 { margin-bottom: 25px; color: #2c3e50; }
+
+        /* KPI Cards */
+        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #2196F3; }
+        .kpi-card.green { border-left-color: #4CAF50; }
+        .kpi-card.orange { border-left-color: #FF9800; }
+        .kpi-card.purple { border-left-color: #9C27B0; }
+        .kpi-card h3 { font-size: 14px; color: #777; margin-bottom: 8px; text-transform: uppercase; }
+        .kpi-card .value { font-size: 24px; font-weight: bold; color: #333; }
+
+        /* Table */
+        .table-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .table-container h2 { font-size: 18px; margin-bottom: 15px; color: #444; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #555; }
+    </style>
+</head>
+<body>
+
+    <h1>📊 Sales & Revenue Dashboard</h1>
+
+    <!-- KPI Metrics -->
+    <div class="kpi-container">
+        <div class="kpi-card green">
+            <h3>Total Revenue</h3>
+            <div class="value" id="total-revenue">₹0.00</div>
+        </div>
+        <div class="kpi-card blue">
+            <h3>Total Orders</h3>
+            <div class="value" id="total-orders">0</div>
+        </div>
+        <div class="kpi-card orange">
+            <h3>Net Sales</h3>
+            <div class="value" id="total-sales">₹0.00</div>
+        </div>
+        <div class="kpi-card purple">
+            <h3>GST Collected</h3>
+            <div class="value" id="total-gst">₹0.00</div>
+        </div>
+    </div>
+
+    <!-- Item Sales Table -->
+    <div class="table-container">
+        <h2>🔥 Top Selling Items</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Quantity Sold</th>
+                    <th>Total Item Revenue</th>
+                </tr>
+            </thead>
+            <tbody id="items-table-body">
+                <tr><td colspan="3">Loading report...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:5000/api";
+
+        async function loadReports() {
+            try {
+                const res = await fetch(`${API_URL}/reports`);
+                const data = await res.json();
+                
+                // Update KPI Cards
+                const summary = data.summary;
+                document.getElementById('total-revenue').innerText = `₹${parseFloat(summary.total_revenue).toFixed(2)}`;
+                document.getElementById('total-orders').innerText = summary.total_orders;
+                document.getElementById('total-sales').innerText = `₹${parseFloat(summary.total_sales).toFixed(2)}`;
+                document.getElementById('total-gst').innerText = `₹${parseFloat(summary.total_gst).toFixed(2)}`;
+
+                // Update Items Table
+                const tableBody = document.getElementById('items-table-body');
+                if (data.items.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3">No sales recorded yet.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = '';
+                data.items.forEach(item => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td><strong>${item.name}</strong></td>
+                            <td>${item.total_qty} pcs</td>
+                            <td>₹${parseFloat(item.item_revenue).toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                console.error("Error loading report", e);
+            }
+        }
+
+        loadReports();
+    </script>
+</body>
+</html>
